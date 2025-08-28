@@ -146,35 +146,9 @@ local function createESP(character)
     local rootPart = character:FindFirstChild("HumanoidRootPart")
     if not rootPart then return end
     
-    -- Criar BillboardGui
-    local billboardGui = Instance.new("BillboardGui")
-    billboardGui.Name = "ESP_GUI"
-    billboardGui.Adornee = rootPart
-    billboardGui.Size = UDim2.new(0, 200, 0, 50)
-    billboardGui.StudsOffset = Vector3.new(0, 3, 0)
-    billboardGui.AlwaysOnTop = true
-    billboardGui.Parent = rootPart
+    -- Apenas o Highlight do corpo (sem nomes)
     
-    -- Frame principal
-    local frame = Instance.new("Frame")
-    frame.Size = UDim2.new(1, 0, 1, 0)
-    frame.BackgroundColor3 = Color3.fromRGB(0, 255, 0)
-    frame.BackgroundTransparency = 0.7
-    frame.BorderSizePixel = 2
-    frame.BorderColor3 = Color3.fromRGB(0, 255, 0)
-    frame.Parent = billboardGui
-    
-    -- Label com nome do jogador
-    local nameLabel = Instance.new("TextLabel")
-    nameLabel.Size = UDim2.new(1, 0, 1, 0)
-    nameLabel.BackgroundTransparency = 1
-    nameLabel.Text = character.Name
-    nameLabel.TextColor3 = Color3.fromRGB(255, 255, 255)
-    nameLabel.TextScaled = true
-    nameLabel.Font = Enum.Font.GothamBold
-    nameLabel.TextStrokeTransparency = 0
-    nameLabel.TextStrokeColor3 = Color3.fromRGB(0, 0, 0)
-    nameLabel.Parent = frame
+
     
     -- Highlight do corpo
     local highlight = Instance.new("Highlight")
@@ -186,14 +160,12 @@ local function createESP(character)
     highlight.OutlineTransparency = 0
     highlight.Parent = character
     
-    espBoxes[character] = {billboardGui, highlight}
+    espBoxes[character] = highlight
 end
 
 local function removeESP(character)
     if espBoxes[character] then
-        for _, obj in pairs(espBoxes[character]) do
-            if obj then obj:Destroy() end
-        end
+        if espBoxes[character] then espBoxes[character]:Destroy() end
         espBoxes[character] = nil
     end
 end
