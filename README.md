@@ -12,7 +12,6 @@ local playerGui = player:WaitForChild("PlayerGui")
 -- Variáveis de controle
 local flying = false
 local espEnabled = false
-local autoTeleporting = false
 local flyConnection
 local espBoxes = {}
 
@@ -24,7 +23,7 @@ screenGui.Parent = playerGui
 
 local mainFrame = Instance.new("Frame")
 mainFrame.Name = "MainFrame"
-mainFrame.Size = UDim2.new(0, 200, 0, 170)
+mainFrame.Size = UDim2.new(0, 200, 0, 120)
 mainFrame.Position = UDim2.new(0, 10, 0, 10)
 mainFrame.BackgroundColor3 = Color3.fromRGB(40, 40, 40)
 mainFrame.BorderSizePixel = 2
@@ -60,20 +59,6 @@ espButton.TextColor3 = Color3.fromRGB(255, 255, 255)
 espButton.TextScaled = true
 espButton.Font = Enum.Font.GothamBold
 espButton.Parent = mainFrame
-
--- Botão de Auto Teleport
-local autoTeleportButton = Instance.new("TextButton")
-autoTeleportButton.Name = "AutoTeleportButton"
-autoTeleportButton.Size = UDim2.new(0, 180, 0, 40)
-autoTeleportButton.Position = UDim2.new(0, 10, 0, 110)
-autoTeleportButton.BackgroundColor3 = Color3.fromRGB(60, 60, 60)
-autoTeleportButton.BorderSizePixel = 2
-autoTeleportButton.BorderColor3 = Color3.fromRGB(255, 255, 255)
-autoTeleportButton.Text = "AUTO TELEPORT"
-autoTeleportButton.TextColor3 = Color3.fromRGB(255, 255, 255)
-autoTeleportButton.TextScaled = true
-autoTeleportButton.Font = Enum.Font.GothamBold
-autoTeleportButton.Parent = mainFrame
 
 -- Função de Voo
 local function startFlying()
@@ -189,8 +174,19 @@ local function updateESP()
     if espEnabled then
         for _, otherPlayer in pairs(Players:GetPlayers()) do
             if otherPlayer ~= player and otherPlayer.Character then
-                if not espBoxes[otherPlayer.Character] then
-                    createESP(otherPlayer.Character)
+                -- Remover ESP existente primeiro
+                if espBoxes[otherPlayer.Character] then
+                    removeESP(otherPlayer.Character)
+                end
+                
+                -- Verificar inventário e criar ESP se estiver vazio
+                local backpack = otherPlayer:FindFirstChild("Backpack")
+                if backpack and #backpack:GetChildren() == 0 then
+                    -- Verificar se não tem ferramenta equipada
+                    local equippedTool = otherPlayer.Character:FindFirstChildOfClass("Tool")
+                    if not equippedTool then
+                        createESP(otherPlayer.Character)
+                    end
                 end
             end
         end
@@ -271,6 +267,78 @@ local function autoTeleportToPlayers()
     autoTeleportButton.BorderColor3 = Color3.fromRGB(255, 255, 255)
     autoTeleportButton.Text = "AUTO TELEPORT"
 end
+-- Função Auto Teleport
+local function autoTeleportToPlayers()
+    if autoTeleporting then return end
+    autoTeleporting = true
+    
+    local character = player.Character
+    if not character then 
+        autoTeleporting = false
+        return 
+    end
+    
+    local humanoidRootPart = character:FindFirstChild("HumanoidRootPart")
+    local humanoid = character:FindFirstChild("Humanoid")
+    
+    if not humanoidRootPart or not humanoid then 
+        autoTeleporting = false
+        return 
+    end
+    
+    -- Salvar posição original
+    local originalPosition = humanoidRootPart.CFrame
+    
+    -- Pegar todos os outros jogadores
+    local otherPlayers = {}
+    for _, otherPlayer in pairs(Players:GetPlayers()) do
+        if otherPlayer ~= player and otherPlayer.Character and otherPlayer.Character:FindFirstChild("HumanoidRootPart") then
+            table.insert(otherPlayers, otherPlayer)
+        end
+    end
+    
+    -- Teleportar para cada jogador
+    for _, targetPlayer in pairs(otherPlayers) do
+        if not autoTeleporting then break end
+        
+        local targetCharacter = targetPlayer.Character
+        if targetCharacter and targetCharacter:FindFirstChild("HumanoidRootPart") then
+            local targetRootPart = targetCharacter:FindFirstChild("HumanoidRootPart")
+            
+            -- Teleportar para o jogador
+            humanoidRootPart.CFrame = targetRootPart.CFrame + Vector3.new(0, 0, -5)
+            
+            -- Equipar ferramenta 1 (primeira ferramenta do inventário)
+            local backpack = player:FindFirstChild("Backpack")
+            if backpack then
+                local tool = backpack:FindFirstChildOfClass("Tool")
+                if tool then
+                    humanoid:EquipTool(tool)
+                    
+                    -- Usar a ferramenta (simular clique)
+                    tool:Activate()
+                end
+            end
+            
+            -- Esperar 4 segundos
+            wait(4)
+        end
+    end
+    
+    -- Voltar para posição original
+    if character and character:FindFirstChild("HumanoidRootPart") then
+        character.HumanoidRootPart.CFrame = originalPosition
+    end
+    
+    autoTeleporting = false
+    
+    -- Resetar cor do botão
+    autoTeleportButton.BackgroundColor3 = Color3.fromRGB(60, 60, 60)
+    autoTeleportButton.BorderColor3 = Color3.fromRGB(255, 255, 255)
+    autoTeleportButton.Text = "AUTO TELEPORT"
+end
+
+-- Eventos dos botões
 -- Eventos dos botões
 flyButton.MouseButton1Click:Connect(function()
     flying = not flying
@@ -300,26 +368,19 @@ espButton.MouseButton1Click:Connect(function()
     updateESP()
 end)
 
-autoTeleportButton.MouseButton1Click:Connect(function()
-    if autoTeleporting then return end
-    
-    -- Mostrar que está processando
-    autoTeleportButton.BackgroundColor3 = Color3.fromRGB(255, 165, 0) -- Laranja
-    autoTeleportButton.BorderColor3 = Color3.fromRGB(255, 165, 0)
-    autoTeleportButton.Text = "TELEPORTING..."
-    
-    -- Executar auto teleport em uma nova thread
-    spawn(function()
-        autoTeleportToPlayers()
-    end)
-end)
-
 -- Eventos para novos jogadores
 Players.PlayerAdded:Connect(function(newPlayer)
     newPlayer.CharacterAdded:Connect(function(character)
         if espEnabled then
             wait(1) -- Esperar o personagem carregar completamente
-            createESP(character)
+            -- Verificar inventário antes de criar ESP
+            local backpack = newPlayer:FindFirstChild("Backpack")
+            if backpack and #backpack:GetChildren() == 0 then
+                local equippedTool = character:FindFirstChildOfClass("Tool")
+                if not equippedTool then
+                    createESP(character)
+                end
+            end
         end
     end)
 end)
@@ -330,11 +391,41 @@ for _, existingPlayer in pairs(Players:GetPlayers()) do
         existingPlayer.CharacterAdded:Connect(function(character)
             if espEnabled then
                 wait(1)
-                createESP(character)
+                -- Verificar inventário antes de criar ESP
+                local backpack = existingPlayer:FindFirstChild("Backpack")
+                if backpack and #backpack:GetChildren() == 0 then
+                    local equippedTool = character:FindFirstChildOfClass("Tool")
+                    if not equippedTool then
+                        createESP(character)
+                    end
+                end
             end
         end)
     end
 end
+
+-- Atualizar ESP automaticamente quando inventário muda
+RunService.Heartbeat:Connect(function()
+    if espEnabled then
+        for _, otherPlayer in pairs(Players:GetPlayers()) do
+            if otherPlayer ~= player and otherPlayer.Character then
+                local character = otherPlayer.Character
+                local backpack = otherPlayer:FindFirstChild("Backpack")
+                local equippedTool = character:FindFirstChildOfClass("Tool")
+                
+                -- Se tem ESP mas agora tem itens, remover ESP
+                if espBoxes[character] and (not backpack or #backpack:GetChildren() > 0 or equippedTool) then
+                    removeESP(character)
+                end
+                
+                -- Se não tem ESP mas inventário está vazio, criar ESP
+                if not espBoxes[character] and backpack and #backpack:GetChildren() == 0 and not equippedTool then
+                    createESP(character)
+                end
+            end
+        end
+    end
+end)
 
 -- Limpeza quando jogador sai
 Players.PlayerRemoving:Connect(function(leavingPlayer)
